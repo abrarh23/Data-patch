@@ -9,19 +9,21 @@ import time
 
 def connect_mongodb():
     # Connect to MongoDB
-    MONGODB_PROD_URI = os.getenv("MONGODB_PROD_URI")
-    client = MongoClient(MONGODB_PROD_URI)  # Update with your connection string
+    MONGODB_PROD_URI = os.getenv("MONGO_STG_URI")
+    MONGO_STG_URI = os.getenv("MONGODB_STG_URI")
+    client = MongoClient(MONGO_STG_URI)  # Update with your connection string
     # If connection is established 
     if client:
-        print("Connected to:", MONGODB_PROD_URI)
+        print("Connected to:", MONGO_STG_URI)
     db = client['qureos-v3']  # Replace with your database name
-    collection_apprentices_users = db['apprentices']  # Replace with your collection name
+    collection_apprentices_users = db['externalUsers']  # Replace with your collection name
     return collection_apprentices_users
 
 def read_csv_file(csv_file_path: str) -> pd.DataFrame:
     # Read updates from CSV
     updates_df = pd.read_csv(csv_file_path, encoding='utf-8', low_memory=False)
     test_df = updates_df.copy()
+    test_df['nationality_country'] = 'Saudi'
     return test_df
 
 def preprocessing_data(test_df: pd.DataFrame) -> pd.DataFrame:
@@ -35,12 +37,12 @@ def prepare_bulk_ops(final_df: pd.DataFrame):
     operations_apprentices_users = []
     current_timestamp = datetime.now(timezone.utc)  # Get the current UTC timestamp
     valid_bson_count = 0
-    for _, row in final_df.iterrows():
+    for _, row in final_df[:10].iterrows():
         if ObjectId.is_valid(row['_id']):
             valid_bson_count += 1
             update_operation = {
                 '$set': {
-                    'nationality': str(row['nationality']) if str(row['nationality']) != 'nan' else None,
+                    'inferredNationality': str(row['nationality_country']) if str(row['nationality_country']) != 'nan' else None,
                     'updatedAt': current_timestamp  # Include the updatedAt field
                 }
             }
@@ -51,7 +53,7 @@ def prepare_bulk_ops(final_df: pd.DataFrame):
                     update_operation
                 )
             )
-            print("Idx:", valid_bson_count, "\nCandidate Id:", row['_id'], "\nold_nationality: Emirati", "\nnew_nationality:", str(row['nationality']) if str(row['nationality']) != 'nan' else None)
+            print("Idx:", valid_bson_count, "\nCandidate Id:", row['_id'], "\nold_nationality: None", "\nnew_nationality:", str(row['nationality_country']) if str(row['nationality_country']) != 'nan' else None)
             print(update_operation)
         else:
             print(f"Skipping invalid ObjectId: {row['_id']}")
@@ -68,11 +70,11 @@ def execute_bulk_ops(collection_apprentices_users, operations_apprentices_users:
 
 if __name__ == "__main__":
     collection_apprentices_users = connect_mongodb()
-    test_df = read_csv_file(r'.\data\non_emiratis.csv')
-    final_df = preprocessing_data(test_df)
-    print("Running on:", len(final_df), "candidates")
+    test_df = read_csv_file(r'./remaining_saudis_nationality_assigned.csv')
+    # final_df = preprocessing_data(test_df)
+    print("Running on:", len(test_df[:10]), "candidates")
     # time.sleep(10)
-    operations_apprentices_users = prepare_bulk_ops(final_df)
+    operations_apprentices_users = prepare_bulk_ops(test_df[:10])
     execute_bulk_ops(collection_apprentices_users,  
                      operations_apprentices_users, 
                      batch_size=100)

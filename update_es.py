@@ -1,9 +1,9 @@
-from elasticsearch import Elasticsearch
+from elasticsearch import Elasticsearch, helpers
 import pandas as pd
 import os
 from dotenv import load_dotenv
 load_dotenv()
-from elasticsearch import Elasticsearch, helpers
+
 from datetime import datetime, timezone
 import time
 
