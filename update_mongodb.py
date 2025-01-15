@@ -9,15 +9,15 @@ import time
 
 def connect_mongodb():
     # Connect to MongoDB
-    MONGODB_PROD_URI = os.getenv("MONGO_STG_URI")
-    MONGO_STG_URI = os.getenv("MONGODB_STG_URI")
-    client = MongoClient(MONGO_STG_URI)  # Update with your connection string
+    MONGODB_PROD_URI = os.getenv("MONGODB_PROD_URI")
+    # MONGO_STG_URI = os.getenv("MONGODB_STG_URI")
+    client = MongoClient(MONGODB_PROD_URI)  # Update with your connection string
     # If connection is established 
     if client:
-        print("Connected to:", MONGO_STG_URI)
+        print("Connected to:", MONGODB_PROD_URI)
     db = client['qureos-v3']  # Replace with your database name
-    collection_apprentices_users = db['externalUsers']  # Replace with your collection name
-    return collection_apprentices_users
+    collection_external_users = db['externalUsers']  # Replace with your collection name
+    return collection_external_users
 
 def read_csv_file(csv_file_path: str) -> pd.DataFrame:
     # Read updates from CSV
@@ -34,10 +34,10 @@ def preprocessing_data(test_df: pd.DataFrame) -> pd.DataFrame:
     return final_df
 
 def prepare_bulk_ops(final_df: pd.DataFrame):
-    operations_apprentices_users = []
+    operations_external_users = []
     current_timestamp = datetime.now(timezone.utc)  # Get the current UTC timestamp
     valid_bson_count = 0
-    for _, row in final_df[:10].iterrows():
+    for _, row in final_df.iterrows():
         if ObjectId.is_valid(row['_id']):
             valid_bson_count += 1
             update_operation = {
@@ -47,35 +47,35 @@ def prepare_bulk_ops(final_df: pd.DataFrame):
                 }
             }
                         
-            operations_apprentices_users.append(
+            operations_external_users.append(
                 UpdateOne(
                     {'_id': ObjectId(row['_id'])}, 
                     update_operation
                 )
             )
             print("Idx:", valid_bson_count, "\nCandidate Id:", row['_id'], "\nold_nationality: None", "\nnew_nationality:", str(row['nationality_country']) if str(row['nationality_country']) != 'nan' else None)
-            print(update_operation)
+            # print(update_operation)
         else:
             print(f"Skipping invalid ObjectId: {row['_id']}")
 
-    return operations_apprentices_users
+    return operations_external_users
 
-def execute_bulk_ops(collection_apprentices_users, operations_apprentices_users: list, batch_size: int):
+def execute_bulk_ops(collection_external_users, operations_external_users: list, batch_size: int):
     # Execute bulk update in batches
-    if operations_apprentices_users:
-        for i in range(0, len(operations_apprentices_users), batch_size):
-            apprentices_users_batch = operations_apprentices_users[i:i + batch_size]
-            result = collection_apprentices_users.bulk_write(apprentices_users_batch)
+    if operations_external_users:
+        for i in range(0, len(operations_external_users), batch_size):
+            external_users_batch = operations_external_users[i:i + batch_size]
+            result = collection_external_users.bulk_write(external_users_batch)
             print(f'Modified count for external users batch starting at index {i}: {result.modified_count}')
 
 if __name__ == "__main__":
-    collection_apprentices_users = connect_mongodb()
-    test_df = read_csv_file(r'./remaining_saudis_nationality_assigned.csv')
-    # final_df = preprocessing_data(test_df)
-    print("Running on:", len(test_df[:10]), "candidates")
-    # time.sleep(10)
-    operations_apprentices_users = prepare_bulk_ops(test_df[:10])
-    execute_bulk_ops(collection_apprentices_users,  
-                     operations_apprentices_users, 
+    collection_external_users = connect_mongodb()
+    test_df = read_csv_file(r'data\remaining_saudis_nationality_assigned.csv')
+    final_df = preprocessing_data(test_df)
+    print("Running on:", len(final_df), "candidates")
+    time.sleep(10)
+    operations_external_users = prepare_bulk_ops(final_df)
+    execute_bulk_ops(collection_external_users,  
+                     operations_external_users, 
                      batch_size=100)
 

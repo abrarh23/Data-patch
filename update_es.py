@@ -31,7 +31,7 @@ def connect_to_es() -> Elasticsearch:
 def read_csv_file(csv_file_path: str) -> pd.DataFrame:
     # Read updates from CSV
     updates_df = pd.read_csv(csv_file_path, encoding='utf-8', low_memory=False)
-    test_df = updates_df.copy()
+    test_df = updates_df[:1].copy()
     return test_df
 
 def preprocessing_data(test_df: pd.DataFrame) -> pd.DataFrame:
@@ -105,10 +105,10 @@ def execute_bulk_ops(es: Elasticsearch, final_df: pd.DataFrame):
 
 def main():
     es = connect_to_es()
-    test_df = read_csv_file(r'.\data\non_emiratis.csv')
+    test_df = read_csv_file(r'data\remaining_saudis_nationality_assigned.csv')
     final_df = preprocessing_data(test_df)
     print("After preprocessing data running on:", len(final_df), "candidates")
-    # time.sleep(10)
+    time.sleep(10)
     execute_bulk_ops(es, final_df)
 
 if __name__ == "__main__":
